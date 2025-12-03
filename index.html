@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>To-Do List</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap');
+
+  body {
+    margin: 0;
+    font-family: 'Orbitron', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #0f2027);
+    background-size: 400% 400%;
+    animation: gradientBG 20s ease infinite;
+    color: #00fff7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    position: relative;
+  }
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  body.dark {
+    background: #0f0f0f !important;
+    color: #00fff7 !important;
+  }
+
+  canvas { position: absolute; top:0; left:0; width:100%; height:100%; z-index:0; }
+
+  h2 {
+    font-size: 2.5rem;
+    letter-spacing: 2px;
+    margin-bottom: 30px;
+    text-shadow: 0 0 10px #00fff7, 0 0 20px #00fff7;
+    z-index:1;
+    position: relative;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+    background: rgba(0,0,0,0.3);
+    padding: 15px 20px;
+    border-radius: 20px;
+    z-index:1;
+    position: relative;
+  }
+
+  input, select, button {
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: none;
+    font-size: 1rem;
+    outline: none;
+    background: rgba(255,255,255,0.05);
+    color: #00fff7;
+    border: 1px solid #00fff7;
+    box-shadow: 0 0 10px rgba(0,255,247,0.2);
+    transition: all 0.3s ease;
+  }
+
+  input::placeholder { color: rgba(0,255,247,0.5); }
+
+  button {
+    background: #00fff7;
+    color: #0f2027;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #00c7aa;
+    box-shadow: 0 0 15px #00fff7, 0 0 30px #00fff7 inset;
+  }
+
+  #taskList {
+    list-style: none;
+    padding-left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 50vh;
+    overflow-y: auto;
+    z-index:1;
+    position: relative;
+  }
+
+  li {
+    background: rgba(255,255,255,0.05);
+    padding: 20px;
+    border-radius: 25px;
+    backdrop-filter: blur(15px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    position: relative;
+    box-shadow: 0 0 20px rgba(0,255,247,0.3);
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0px); }
+    50% { transform: translateY(-5px); }
+  }
+
+  li:hover { 
+    transform: scale(1.05); 
+    box-shadow: 0 0 40px #00fff7, 0 0 60px #00fff7 inset, 0 0 80px #00fff7; 
+  }
+
+  li.done .task-text { text-decoration: line-through; color: rgba(0,255,247,0.5); }
+  li.high { border-left: 8px solid #ff0055; }
+  li.medium { border-left: 8px solid #ffaa00; }
+  li.low { border-left: 8px solid #00ff55; }
+
+  .task-buttons {
+    display: flex;
+    gap: 10px;
+  }
+
+  .task-buttons button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 10px;
+    background: rgba(0,255,247,0.1);
+    color: #00fff7;
+    border: 1px solid #00fff7;
+    transition: all 0.3s ease;
+  }
+
+  .task-buttons button:hover {
+    background: rgba(0,255,247,0.4);
+  }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+<h2>To-Do List</h2>
+
+<div class="controls">
+  <button onclick="toggleDark()">Switch to Light Mode</button>
+  <input type="text" id="taskInput" placeholder="New task...">
+  <select id="prioritySelect">
+    <option value="high">High</option>
+    <option value="medium" selected>Medium</option>
+    <option value="low">Low</option>
+  </select>
+  <button onclick="addTask()">Add</button>
+</div>
+
+<div class="controls">
+  <input type="text" id="searchInput" placeholder="Search tasks..." oninput="filterTasks()">
+  <select id="filterSelect" onchange="filterTasks()">
+    <option value="all">All</option>
+    <option value="done">Done</option>
+    <option value="undone">Undone</option>
+  </select>
+</div>
+
+<ul id="taskList"></ul>
+
+<script>
+document.body.classList.add('dark'); // load dark mode by default
+
+function toggleDark() {
+  document.body.classList.toggle('dark');
+  const btn = document.querySelector('button');
+  btn.textContent = document.body.classList.contains('dark') ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+}
+
+const taskList = document.getElementById('taskList');
+const input = document.getElementById('taskInput');
+const prioritySelect = document.getElementById('prioritySelect');
+
+function saveTasks() {
+  const tasks = [];
+  taskList.querySelectorAll('li').forEach(li => {
+    tasks.push({
+      text: li.querySelector('.task-text').textContent,
+      done: li.classList.contains('done'),
+      priority: li.dataset.priority
+    });
+  });
+  localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
+function loadTasks() {
+  const tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+  tasks.forEach(t => createTaskElement(t.text, t.priority, t.done));
+}
+
+function createTaskElement(text, priority='medium', done=false) {
+  const li = document.createElement('li');
+  li.dataset.priority = priority;
+  li.classList.add(priority);
+  if(done) li.classList.add('done');
+  
+  const span = document.createElement('span');
+  span.className = 'task-text';
+  span.textContent = text;
+  li.appendChild(span);
+
+  li.onclick = (e) => {
+    if(!e.target.closest('.task-buttons')){
+      li.classList.toggle('done');
+      saveTasks();
+      filterTasks();
+    }
+  };
+
+  const buttonsDiv = document.createElement('div');
+  buttonsDiv.className = 'task-buttons';
+
+  const delBtn = document.createElement('button');
+  delBtn.textContent = 'Delete';
+  delBtn.onclick = (e) => { e.stopPropagation(); li.remove(); saveTasks(); filterTasks(); };
+  buttonsDiv.appendChild(delBtn);
+
+  const editBtn = document.createElement('button');
+  editBtn.textContent = 'Edit';
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    const t = prompt('Edit task:', span.textContent);
+    if(t) span.textContent = t;
+    saveTasks();
+    filterTasks();
+  };
+  buttonsDiv.appendChild(editBtn);
+
+  li.appendChild(buttonsDiv);
+  taskList.appendChild(li);
+  saveTasks();
+  return li;
+}
+
+function addTask() {
+  const task = input.value.trim();
+  if(!task) return;
+  createTaskElement(task, prioritySelect.value);
+  input.value = '';
+  filterTasks();
+}
+
+function filterTasks() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const filter = document.getElementById('filterSelect').value;
+  document.querySelectorAll('#taskList li').forEach(li => {
+    const matchesText = li.querySelector('.task-text').textContent.toLowerCase().includes(search);
+    const matchesFilter = filter==='all' || (filter==='done' && li.classList.contains('done')) || (filter==='undone' && !li.classList.contains('done'));
+    li.style.display = (matchesText && matchesFilter) ? '' : 'none';
+  });
+}
+
+window.onload = loadTasks;
+
+// Neon particles
+const canvas = document.getElementById('particles');
+const ctx = canvas.getContext('2d');
+let width = canvas.width = window.innerWidth;
+let height = canvas.height = window.innerHeight;
+const particles = [];
+for(let i=0;i<80;i++){
+  particles.push({x:Math.random()*width, y:Math.random()*height, vx:(Math.random()-0.5)*0.7, vy:(Math.random()-0.5)*0.7, size:Math.random()*3+1});
+}
+
+function animate() {
+  ctx.clearRect(0,0,width,height);
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0||p.x>width) p.vx*=-1;
+    if(p.y<0||p.y>height) p.vy*=-1;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+    ctx.shadowColor = '#00fff7';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(0,255,247,0.6)';
+    ctx.fill();
+  });
+  requestAnimationFrame(animate);
+}
+window.addEventListener('resize',()=>{width=canvas.width=window.innerWidth;height=canvas.height=window.innerHeight;});
+animate();
+</script>
+</body>
+</html>
